@@ -1,0 +1,54 @@
+name: Telegram Media Downloader
+
+on:
+  workflow_dispatch:
+    inputs:
+      telegram_link:
+        description: 'Telegram media link'
+        required: true
+        type: string
+      output_filename:
+        description: 'Output filename for download (optional)'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  tg-download:
+    runs-on: ubuntu-latest
+    outputs:
+      downloaded_path: ${{ steps.download.outputs.downloaded_path }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download media
+        id: download
+        run: |
+          echo "Starting download process..."
+          python src/tg_downloader.py \
+            --link "${{ github.event.inputs.telegram_link }}" \
+            --output_filename "${{ github.event.inputs.output_filename }}"
+          
+          # Extract the downloaded path from stdout if available
+          # This assumes your python script prints the path like: "Downloaded to: /path/to/file"
+          downloaded_file=$(grep "Downloaded to:" stdout | sed 's/Downloaded to: //')
+          if [ -n "$downloaded_file" ]; then
+            echo "Downloaded path detected: $downloaded_file"
+            echo "downloaded_path=$downloaded_file" >> $GITHUB_OUTPUT
+          else
+            echo "Could not automatically detect downloaded path. Please ensure your script prints it correctly."
+            # Fallback or error handling could be added here if needed
+          fi
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          # No longer requiring ACTIVATION_CODE secret
